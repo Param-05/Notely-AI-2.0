@@ -1,125 +1,14 @@
-// import { createServerClient } from "@supabase/ssr";
-// import { NextResponse, type NextRequest } from "next/server";
-
-// export async function middleware(request: NextRequest) {
-//   return await updateSession(request);
-// }
-
-// export const config = {
-//   matcher: [
-//     /*
-//      * Match all request paths except for the ones starting with:
-//      * - _next/static (static files)
-//      * - _next/image (image optimization files)
-//      * - favicon.ico (favicon file)
-//      * Feel free to modify this pattern to include more paths.
-//      */
-//     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-//   ],
-// };
-
-// export async function updateSession(request: NextRequest) {
-//   let supabaseResponse = NextResponse.next({
-//     request,
-//   });
-
-//   // console.log("Middleware running");
-//   // console.log("NEXT URL:", process.env.NEXT_PUBLIC_BASE_URL);
-//   // console.log("SUPABASE_ANON_KEY URL:", process.env.SUPABASE_ANON_KEY);
-//   // console.log("SUPABASE_URL URL:", process.env.SUPABASE_URL);
-//   const supabase = createServerClient(
-//     process.env.SUPABASE_URL!,
-//     process.env.SUPABASE_ANON_KEY!,
-//     {
-//       cookies: {
-//         getAll() {
-//           return request.cookies.getAll();
-//         },
-//         setAll(cookiesToSet) {
-//           cookiesToSet.forEach(({ name, value }) =>
-//             request.cookies.set(name, value),
-//           );
-//           supabaseResponse = NextResponse.next({
-//             request,
-//           });
-//           cookiesToSet.forEach(({ name, value, options }) =>
-//             supabaseResponse.cookies.set(name, value, options),
-//           );
-//         },
-//       },
-//     },
-//   );
-
-//   const isAuthRoute =
-//     request.nextUrl.pathname === "/login" ||
-//     request.nextUrl.pathname === "/sign-up";
-
-//   if (isAuthRoute) {
-//     const {
-//       data: { user },
-//     } = await supabase.auth.getUser();
-
-//     if (user) {
-//       return NextResponse.redirect(
-//         new URL("/", process.env.NEXT_PUBLIC_BASE_URL),
-//       );
-//     }
-//   }
-
-//   // If URL has no noteId, it will go to the latest note, if they don't have any notes it will create a note
-//   const { searchParams, pathname } = new URL(request.url);
-
-//   if (!searchParams.get("noteId") && pathname === "/notes") {
-//     const {
-//       data: { user },
-//     } = await supabase.auth.getUser();
-//     if (user) {
-//       const { newestNoteId } = await fetch(
-//         `${process.env.NEXT_PUBLIC_BASE_URL}/api/fetch-newest-note?userId=${user.id}`,
-//       ).then((res) => res.json()); // prisma doesn't work directly in middleware so we create and call an API endpoint
-//       if (newestNoteId) {
-//         const url = request.nextUrl.clone();
-//         url.searchParams.set("noteId", newestNoteId);
-//         return NextResponse.redirect(url);
-//       } else {
-//         const { noteId } = await fetch(
-//           `${process.env.NEXT_PUBLIC_BASE_URL}/api/create-new-note?userId=${user.id}`,
-//           {
-//             method: "POST",
-//             headers: {
-//               "Content-Type": "application/json",
-//             },
-//           },
-//         ).then((res) => res.json());
-//         const url = request.nextUrl.clone();
-//         url.searchParams.set("noteId", noteId);
-//         return NextResponse.redirect(url);
-//       }
-//     }
-//   }
-
-//   return supabaseResponse;
-// }
-
+// middleware.ts
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Add this tiny helper
 async function safeJson(res: Response) {
   const ct = res.headers.get("content-type") || "";
   if (!ct.includes("application/json")) {
     const txt = await res.text();
-    // This throws with a helpful message if the API ever returns HTML/redirect/etc.
-    throw new Error(
-      `Expected JSON, got ${res.status} ${res.statusText} (${ct}). ` +
-      `Body: ${txt.slice(0, 200)}`
-    );
+    throw new Error(`Expected JSON, got ${res.status} ${res.statusText} (${ct}). Body: ${txt.slice(0, 200)}`);
   }
   return res.json();
-}
-
-export async function middleware(request: NextRequest) {
-  return await updateSession(request);
 }
 
 export const config = {
@@ -128,7 +17,7 @@ export const config = {
   ],
 };
 
-export async function updateSession(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -148,50 +37,53 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const isAuthRoute =
-    request.nextUrl.pathname === "/login" ||
-    request.nextUrl.pathname === "/sign-up";
+  const url = new URL(request.url);
+  const { pathname, search } = url;
+  const origin = url.origin;
+  const cookie = request.headers.get("cookie") ?? "";
 
-  if (isAuthRoute) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      // Use the real request URL as base, not an env var
-      return NextResponse.redirect(new URL("/", request.url));
-    }
+  const isAuthRoute = pathname === "/login" || pathname === "/sign-up";
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // If already logged in, keep auth routes unreachable
+  if (isAuthRoute && user) {
+    return NextResponse.redirect(new URL("/notes", request.url));
   }
 
-  const { searchParams, pathname } = new URL(request.url);
+  const hitsNotes = pathname === "/notes" || pathname === "/";
 
-  if (!searchParams.get("noteId") && pathname === "/notes") {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      // 👇 Build a guaranteed-correct absolute URL + forward cookies
-      const origin = request.nextUrl.origin;
-      const cookie = request.headers.get("cookie") ?? "";
-      console.log("Middleware /notes detected, user:", user.id);
+  // 🔒 Gate: guests cannot hit / or /notes
+  if (hitsNotes && !user) {
+    const next = `${pathname}${search || ""}`;
+    const dest = new URL("/login", request.url);
+    dest.searchParams.set("next", next); // for post-login redirect
+    return NextResponse.redirect(dest);
+  }
 
-      // 1) Try newest note
+  // Logged-in behavior: attach newest note (or create), then land on /notes?noteId=...
+  if (user && hitsNotes) {
+    const hasNoteId = url.searchParams.has("noteId");
+
+    if (!hasNoteId) {
+      // 1) Try newest
       const newestRes = await fetch(
         `${origin}/api/fetch-newest-note?userId=${user.id}`,
-        { method: "GET", headers: { accept: "application/json", cookie } },
+        { headers: { accept: "application/json", cookie } },
       );
 
       let newestNoteId: string | null = null;
       try {
         const newest = await safeJson(newestRes);
         newestNoteId = newest?.newestNoteId ?? null;
-      } catch (e) {
-        // swallow to fall through to create; logs help if needed
-        // console.error("fetch-newest-note returned non-JSON:", e);
-      }
+      } catch {}
 
+      const target = new URL("/notes", request.url);
       if (newestNoteId) {
-        const url = request.nextUrl.clone();
-        url.searchParams.set("noteId", newestNoteId);
-        return NextResponse.redirect(url);
+        target.searchParams.set("noteId", newestNoteId);
+        return NextResponse.redirect(target);
       }
 
-      // 2) Create note
+      // 2) Create new note
       const createRes = await fetch(
         `${origin}/api/create-new-note?userId=${user.id}`,
         {
@@ -199,15 +91,20 @@ export async function updateSession(request: NextRequest) {
           headers: {
             "content-type": "application/json",
             accept: "application/json",
-            cookie, // 👈 forward cookies here too
+            cookie,
           },
         },
       );
 
-      const created = await safeJson(createRes); // throws if not JSON
-      const url = request.nextUrl.clone();
-      url.searchParams.set("noteId", created.noteId);
-      return NextResponse.redirect(url);
+      const created = await safeJson(createRes);
+      target.searchParams.set("noteId", created.noteId);
+      return NextResponse.redirect(target);
+    }
+
+    // If user is at "/" (even with noteId), canonicalize to /notes
+    if (pathname === "/") {
+      const target = new URL("/notes" + search, request.url);
+      return NextResponse.redirect(target);
     }
   }
 

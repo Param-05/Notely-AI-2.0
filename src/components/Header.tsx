@@ -28,7 +28,7 @@ async function Header() {
           priority
         ></Image>
         <h1 className="flex flex-col px-1 pb-1 text-2xl leading-6 font-semibold">
-          Study Buddy
+          Notely AI
         </h1>
       </Link>
       <div className="flex gap-4">
