@@ -1,0 +1,132 @@
+/* 🌞 Light Mode (DEFAULT) */
+.submitBtn {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  width: 100%;
+  padding: 10px 20px;
+  font-weight: bold;
+  font-size: 16px;
+  text-transform: uppercase;
+  overflow: hidden;
+  transition: 0.5s;
+  letter-spacing: 3px;
+  cursor: pointer;
+  border-radius: 0.5rem;
+
+  background-color: #f8fafc; /* slate-50 */
+  color: #1e293b;            /* slate-800 */
+}
+
+.submitBtn:hover {
+  background-color: #0f172a; /* Tailwind slate-900 */
+  color: #ffffff;
+}
+
+
+.submitBtn span {
+  position: absolute;
+  display: block;
+}
+
+.submitBtn span:nth-child(1),
+.submitBtn span:nth-child(2),
+.submitBtn span:nth-child(3),
+.submitBtn span:nth-child(4) {
+  background: linear-gradient(90deg, transparent, #60a5fa); /* blue-400 */
+}
+
+/* 🌙 DARK MODE OVERRIDES */
+.dark .submitBtn {
+  background: transparent;
+  color: #fff;
+}
+
+.dark .submitBtn:hover {
+  background: #fff;
+  color: #272727;
+}
+
+.dark .submitBtn span:nth-child(1),
+.dark .submitBtn span:nth-child(2),
+.dark .submitBtn span:nth-child(3),
+.dark .submitBtn span:nth-child(4) {
+  background: linear-gradient(90deg, transparent, #fff);
+}
+
+/* ✅ Animation */
+.submitBtn span:nth-child(1) {
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 2px;
+  animation: btn-anim1 1.5s linear infinite;
+}
+
+.submitBtn span:nth-child(2) {
+  top: -100%;
+  right: 0;
+  width: 2px;
+  height: 100%;
+  animation: btn-anim2 1.5s linear infinite;
+  animation-delay: 0.375s;
+}
+
+.submitBtn span:nth-child(3) {
+  bottom: 0;
+  right: -100%;
+  width: 100%;
+  height: 2px;
+  animation: btn-anim3 1.5s linear infinite;
+  animation-delay: 0.75s;
+}
+
+.submitBtn span:nth-child(4) {
+  bottom: -100%;
+  left: 0;
+  width: 2px;
+  height: 100%;
+  animation: btn-anim4 1.5s linear infinite;
+  animation-delay: 1.125s;
+}
+
+/* Animations */
+@keyframes btn-anim1 {
+  0% {
+    left: -100%;
+  }
+  50%, 100% {
+    left: 100%;
+  }
+}
+
+@keyframes btn-anim2 {
+  0% {
+    top: -100%;
+  }
+  50%, 100% {
+    top: 100%;
+  }
+}
+
+@keyframes btn-anim3 {
+  0% {
+    right: -100%;
+  }
+  50%, 100% {
+    right: 100%;
+  }
+}
+
+@keyframes btn-anim4 {
+  0% {
+    bottom: -100%;
+  }
+  50%, 100% {
+    bottom: 100%;
+  }
+}
